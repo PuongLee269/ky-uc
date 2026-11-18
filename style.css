@@ -1,0 +1,39 @@
+/* Nền tảng nhẹ cho bản web Ký Ức (creative.css chỉ có phần riêng của thẻ). */
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body.ky-body{font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f6f2ea;color:#242a32}
+button{font:inherit;cursor:pointer;min-height:40px;padding:6px 12px;border:1px solid #d8cfbf;border-radius:8px;background:#fffdf8;color:#2a3138}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #c48e31;outline-offset:2px}
+input,textarea{font:inherit;color:#242a32}
+.toast{display:none}
+/* Khung cài đặt và chọn dự án */
+.ky-overlay{position:fixed;inset:0;z-index:6000;background:#f6f2ea;display:flex;align-items:flex-start;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 16px 16px;overflow:auto}
+.ky-overlay[hidden]{display:none}
+#sheet{background:rgba(36,42,50,.45)}
+.ky-card{width:min(440px,100%);margin-top:6vh;background:#fffdf8;border:1px solid #e8e1d6;border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.ky-card h1,.ky-card h2{margin:0}.ky-sub{margin:0;color:#6b6558;font-size:13px}
+.ky-field{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600}
+.ky-field input,.ky-row input{min-height:44px;padding:8px 10px;border:1px solid #d8cfbf;border-radius:8px;background:#fff;font-weight:400}
+.ky-error{margin:0;color:#b3261e;font-size:13px;min-height:1em;white-space:pre-wrap}
+.ky-primary{background:#c48e31;border-color:#a8761f;color:#fff;font-weight:650}
+.ky-danger{color:#b3261e}
+.ky-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
+.ky-item{text-align:left}.ky-item[aria-current=true]{border-color:#c48e31;background:#f8e9cd}
+.ky-row{display:flex;gap:8px}.ky-row input{flex:1;min-width:0}
+.ky-toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:7000;max-width:90vw;background:#2a3138;color:#fff;padding:10px 14px;border-radius:8px;font-size:13px}
+.ky-toast[hidden]{display:none}
+/* Chip trạng thái */
+.ky-chip{font-size:12px;padding:5px 10px;border-radius:999px;background:#eee4d5;color:#4c3b20;white-space:nowrap;max-width:60vw;overflow:hidden;text-overflow:ellipsis}
+.ky-chip[data-state=ok]{background:#e4f2ea;color:#2c6a49}
+.ky-chip[data-state=saving]{background:#f8e9cd;color:#7a5410}
+.ky-chip[data-state=error]{background:#fbe3e0;color:#b3261e}
+/* Bản web không có phần cần máy tính: ẩn chỗ chấm điểm / biểu đồ người xem / lệnh AI. */
+.sp-score-all,.memory-chart-host,.memory-technical,.memory-scope{display:none!important}
+.has-script{grid-template-columns:minmax(0,1fr)!important}
+.memory-page{padding-bottom:0!important}
+.ky-chip[data-state=offline]{background:#ece8e1;color:#5b5548}
+.ky-card select{min-height:44px;padding:8px 10px;border:1px solid #d8cfbf;border-radius:8px;background:#fff;font:inherit}
+.ky-row .ky-item{flex:1;min-width:0}
+.ky-linkbox{display:flex;flex-direction:column;gap:8px;border-top:1px solid #e8e1d6;padding-top:10px}.ky-linkbox h3{margin:0;font-size:15px}
+.ky-steps{display:flex;flex-direction:column;gap:12px}.ky-steps p{margin:4px 0 0}
