@@ -213,6 +213,28 @@ function showSettings(){
 }
 
 /* ---------- hướng dẫn ---------- */
+let installPrompt;
+window.addEventListener('beforeinstallprompt', event => {
+ event.preventDefault();
+ installPrompt = event;
+});
+window.addEventListener('appinstalled', () => { installPrompt = null; });
+
+async function installMobileApp(){
+ if(installPrompt){
+  const prompt = installPrompt;
+  installPrompt = null;
+  await prompt.prompt();
+  return;
+ }
+ openSheet('Cài ứng dụng', box => {
+  box.append(
+   make('p','Android: mở menu Chrome ⋮, chọn Cài đặt ứng dụng hoặc Thêm vào màn hình chính.','ky-sub'),
+   make('p','iPhone: mở bằng Safari, bấm Chia sẻ → Thêm vào màn hình chính. Bật Mở dưới dạng ứng dụng web nếu có, rồi bấm Thêm.','ky-sub')
+  );
+ });
+}
+
 function showGuide(){
  openSheet('Hướng dẫn',box=>{
   const steps=[
@@ -233,6 +255,8 @@ const offlineOnly=what=>()=>{throw new Error(what+' cần máy tính, bản này
 function buildUi(){
  const projectButton=button('📁 …',showProjects,'memory-link ky-project');
  const gear=button('⚙',showSettings,'memory-link');gear.setAttribute('aria-label','Cài đặt');
+ const install=button('Cài app',installMobileApp,'memory-link');
+ install.hidden=matchMedia('(display-mode: standalone)').matches || navigator.standalone===true;
  const help=button('?',showGuide,'memory-link');help.setAttribute('aria-label','Hướng dẫn');
  const script=PicassoScriptPage.mount({
   saveDelay:SAVE_DELAY_MS,
@@ -250,7 +274,7 @@ function buildUi(){
   saveDelay:SAVE_DELAY_MS,
   below:script.el,
   cardAction:{label:'✍ Viết',aria:'Viết kịch bản cho thẻ này',run:card=>script.write(card)},
-  toolbar:[projectButton,chip,gear,help],
+  toolbar:[projectButton,chip,gear,help,install],
   storageScope:()=>'local',
   load:async()=>{const v=store.view(current,'board');return {project:current,board:{version:v.version,cards:v.items}};},
   save:async(project,version,cards)=>{const r=store.save(project,'board',version,cards);scheduleSync(SYNC_DEBOUNCE_MS);return {version:r.version,cards:r.items};},
