@@ -30,7 +30,19 @@ function mount(opts){
  const scoreAll=button('Chấm cả kịch bản',()=>scoreWhole().catch(e=>opts.toast(e.message)),'Chấm cả kịch bản','sp-score-all');
  const done=button('Xong',()=>exitFocus(),'Thoát chế độ viết tập trung','sp-done');
  const copyBtn=button('Copy',()=>copyScript(),'Chép cả kịch bản','sp-copy');
- head.append(make('h2','Kịch bản'),status,scoreAll,copyBtn,done);
+ const makeKids=button('🧩 Tạo thẻ con từ kịch bản',()=>makeChildren().catch(e=>opts.toast(e.message)),'Tạo thẻ con từ các dòng đã đánh nhãn','sp-children');makeKids.hidden=typeof opts.makeChildren!=='function';
+ head.append(make('h2','Kịch bản'),status,scoreAll,copyBtn,makeKids,done);
+ /* Thẻ con được tạo từ các dòng đã đánh nhãn; thẻ Anh tự tạo giữ nguyên. */
+ async function makeChildren(){
+  const marked=blocks.reduce((n,b)=>n+b.lines.filter(l=>l.mark&&l.text.trim()).length,0);
+  if(!marked){opts.toast('Chưa có dòng nào được đánh nhãn V.O / Motion / Tư liệu / Quay.');return;}
+  const parents=new Set(blocks.filter(b=>b.card_id&&b.lines.some(l=>l.mark&&l.text.trim())).map(b=>b.card_id)).size+blocks.filter(b=>!b.card_id&&b.lines.some(l=>l.mark&&l.text.trim())).length;
+  if(!root.confirm('Sẽ tạo/cập nhật thẻ con cho '+parents+' thẻ lớn từ '+marked+' dòng đã đánh nhãn. Thẻ con Anh tự tạo được giữ nguyên.'))return;
+  await saveScreenplay();
+  const r=await opts.makeChildren(pid);
+  opts.toast('Thẻ con: tạo '+r.created+', cập nhật '+r.updated+', xóa '+r.removed+(r.new_big_cards?' · thẻ lớn mới '+r.new_big_cards:'')+'.');
+  sync(await opts.load());
+ }
  /* Chép cả kịch bản thành chữ thường: tiêu đề khối, mỗi dòng kèm nhãn [V.O] [Motion]... */
  function scriptText(){const label=Object.fromEntries(MARKS);return blocks.map(b=>[b.title.trim(),...b.lines.filter(l=>l.text.trim()).map(l=>(l.mark?'['+label[l.mark]+'] ':'')+l.text.trim())].filter(Boolean).join('\n')).filter(Boolean).join('\n\n');}
  async function copyScript(){const text=scriptText();if(!text){opts.toast('Chưa có chữ nào để chép.');return;}

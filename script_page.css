@@ -14,7 +14,7 @@
 .sp-head{display:flex;align-items:center;gap:10px;max-width:760px;margin:0 auto 10px}
 .sp-head h2{margin:0;font-size:16px;letter-spacing:.04em}
 .sp-status{flex:1;font-size:12px;color:#7b7566}
-.memory-page .sp-score-all,.memory-page .sp-add{min-height:34px;font-size:12px;padding:5px 12px}
+.memory-page .sp-score-all,.memory-page .sp-add,.memory-page .sp-children{min-height:34px;font-size:12px;padding:5px 12px}
 .sp-empty{max-width:760px;margin:6px auto 14px;font-size:13px;line-height:1.6;color:#7b7566}
 .sp-page{max-width:760px;margin:0 auto;background:transparent;border:0;box-shadow:none;padding:10px 0 22px;min-height:120px;font-family:"Segoe UI",system-ui,-apple-system,Roboto,"Noto Sans",Arial,sans-serif}
 .sp-page:empty{display:none}
@@ -86,3 +86,7 @@ body.sp-focus .script-host{padding-bottom:64px}
 .memory-page .sp-copy{display:none}
 body.sp-focus .memory-page .sp-copy{display:block;min-height:34px;padding:4px 14px;border:1px solid #e3d3b5;border-radius:99px;background:#fff;color:#6b4a14;font-weight:700;font-size:13px;margin-left:auto}
 body.sp-focus .memory-page .sp-copy+.sp-done{margin-left:0}
+
+body.sp-focus .memory-page .sp-children{display:none}
+@media print{.sp-children{display:none}}
+.memory-page .memory-script-badge{position:absolute;bottom:4px;right:4px;z-index:2;padding:0 5px;border-radius:99px;background:#e8f1ea;color:#2f5a3a;font-size:9px;line-height:16px;pointer-events:none}
