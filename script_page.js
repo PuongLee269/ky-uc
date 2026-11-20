@@ -36,6 +36,11 @@ function mount(opts){
  const chips=MARKS.map(([mark,label])=>{const b=button(label,()=>{const line=markTarget();if(line)toggleMark(line,mark);else opts.toast('Chạm vào một dòng trước khi gán nhãn.');},'Gán nhãn '+label+' cho dòng đang viết','sp-chip');b.dataset.mark=mark;b.setAttribute('aria-pressed','false');b.onpointerdown=e=>e.preventDefault();return b;});
  bar.append(...chips);barWrap.append(bar);const conflictBar=make('p','','sp-conflict');conflictBar.hidden=true;conflictBar.setAttribute('role','alert');
  el.append(head,conflictBar,empty,page,addFree,barWrap);
+ /* Thanh 4 nhãn ẩn sẵn; chạm đúp vào khối kịch bản mới hiện (thoát Xong thì ẩn lại). */
+ barWrap.hidden=true;let lastTap=0;
+ function showBar(){if(!barWrap.hidden)return;barWrap.hidden=false;keyboard();requestAnimationFrame(keepCaret);}
+ page.addEventListener('pointerup',e=>{if(e.button>0)return;const now=e.timeStamp;if(now-lastTap<350)showBar();lastTap=now;});
+ page.addEventListener('dblclick',showBar);
  let pid=null,version=0,blocks=[],ratings={},busy=false,rev=0,dirty=false,timer=null,inflight=Promise.resolve(),pollTimer=null,base=[],cur={block:null,line:null},titleBlock=null,lastLine=null,focusOn=false,drag=null;
  const rows=new WeakMap();
  const cacheKey=()=>'picassoScreenplay:'+pid;
@@ -172,7 +177,7 @@ function mount(opts){
  }
  function exitFocus(fromPop){
   if(!focusOn)return;focusOn=false;endDrag();document.body.classList.remove('sp-focus');
-  document.activeElement?.blur?.();el.style.top=el.style.height=el.style.bottom=barWrap.style.top='';
+  barWrap.hidden=true;document.activeElement?.blur?.();el.style.top=el.style.height=el.style.bottom=barWrap.style.top='';
   if(fromPop!==true&&history.state?.spFocus){try{history.back();}catch(e){}}
  }
  root.addEventListener('popstate',()=>{if(focusOn)exitFocus(true);});

@@ -77,3 +77,9 @@ body.sp-focus .sp-barwrap{margin:0 -6px}
 body.sp-focus .sp-page{padding-bottom:40vh}
 body.sp-focus .sp-barwrap{position:fixed;left:0;right:0;bottom:auto;margin:0;z-index:2950}
 body.sp-focus .script-host{padding-bottom:64px}
+/* Biểu đồ Người xem chấm: ẩn, bấm nút trên thanh mới hiện thành bảng nổi */
+.memory-workspace,.memory-workspace.has-script{grid-template-columns:minmax(0,1fr)!important}
+.memory-workspace>.memory-chart-host,.memory-workspace.has-script>.memory-chart-host{position:fixed;top:64px;right:12px;width:min(440px,calc(100vw - 24px));max-height:70dvh;overflow:auto;z-index:2800;background:#fffdf8;border:1px solid #e3d9c8!important;border-radius:14px;box-shadow:0 12px 40px #1a102633;padding:14px}
+.memory-workspace>.memory-chart-host[hidden]{display:none!important}
+.memory-toolbar button[aria-pressed=true]{background:#fff1d9;border-color:#d7ae69}
+.sp-barwrap[hidden]{display:none!important}

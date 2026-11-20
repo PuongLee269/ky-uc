@@ -37,14 +37,17 @@ function mount(options){
  const page=make('section',undefined,'memory-page');page.hidden=true;page.addEventListener('pointerdown',e=>{if(e.target.closest('button'))cancelCardTap();});page.setAttribute('aria-label','Vùng Ký Ức');
  const toolbar=make('header',undefined,'memory-toolbar'),back=options.persistent?null:button(options.backLabel||'← Sáng tạo',close),heading=make('h1',options.title||'Vùng Ký Ức');
  const add=button('＋',()=>openIcons(null),'Thêm thẻ ký ức'),done=button(options.actionLabel||'Hoàn thành',async()=>{done.disabled=true;try{await save();await options.action(project,ordered(cards));}catch(e){status.textContent=e.message;}finally{done.disabled=false;}});add.className='memory-add';done.className='memory-done';done.hidden=!options.action;
- toolbar.append(...(back?[back]:[]),heading,...(options.toolbar||[]),add,done);
+ const chartBtn=button('📈 Người xem chấm',()=>toggleChart());chartBtn.setAttribute('aria-pressed','false');chartBtn.hidden=!options.viewer;
+ toolbar.append(...(back?[back]:[]),heading,...(options.toolbar||[]),chartBtn,add,done);
  const hint=make('p',options.doubleClickOpen?'Bấm thẻ để ghi chú · Bấm đúp thẻ để xem thẻ con · Bấm đúp vùng trống để thêm thẻ':'Nhấp đúp vùng trống để thêm thẻ · Kéo thẻ để xếp chuyện · Chạm thẻ để ghi chú','memory-hint');
  const status=make('p','', 'memory-status');status.setAttribute('role','status');
  const viewport=make('div',undefined,'memory-viewport');viewport.tabIndex=0;viewport.setAttribute('aria-label','Không gian sắp xếp thẻ. Cuộn hoặc kéo nền để di chuyển.');
  const surface=make('div',undefined,'memory-surface');viewport.append(surface);
  const guideX=make('div',undefined,'memory-guide vertical'),guideY=make('div',undefined,'memory-guide horizontal');guideX.hidden=guideY.hidden=true;
  const empty=make('div','Một câu chuyện bắt đầu từ một ký ức.\nBấm ＋ để tạo thẻ đầu tiên.','memory-empty');
- const emotionHost=make('div',undefined,'memory-chart-host');const workspace=make('div',undefined,'memory-workspace');workspace.append(viewport,emotionHost);if(options.below){workspace.classList.add('has-script');workspace.append(options.below);}page.append(toolbar,hint,status,workspace);document.body.append(page);
+ const emotionHost=make('div',undefined,'memory-chart-host');emotionHost.hidden=true;
+ function toggleChart(force){const show=force??emotionHost.hidden;emotionHost.hidden=!show;chartBtn.setAttribute('aria-pressed',String(show));if(show)viewerChart?.refresh().catch(()=>{});}
+ emotionHost.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();toggleChart(false);chartBtn.focus();}});const workspace=make('div',undefined,'memory-workspace');workspace.append(viewport,emotionHost);if(options.below){workspace.classList.add('has-script');workspace.append(options.below);}page.append(toolbar,hint,status,workspace);document.body.append(page);
  const shade=make('div',undefined,'memory-shade');shade.hidden=true;const dialog=make('section',undefined,'memory-dialog');dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');shade.append(dialog);page.append(shade);
  let cards=[],baseCards=[],version=0,project=null,dirty=false,revision=0,timer=null,saveQueue=Promise.resolve(),active=false,pointerEditing=false,selected=null,lastFocus=null,returnFocus=null,noteEditor=null,backdropStarted=false;
  let emotion=null,viewerChart=null,viewerRatings={},cardTap=null,lastDouble=null;
@@ -100,7 +103,7 @@ function mount(options){
     dirty=true;if(!status.textContent.startsWith('Có thẻ'))status.textContent='Đã khôi phục các thẻ chưa lưu trên thiết bị này.';
    }
    else status.textContent='Đã tải · '+cards.length+' thẻ';
-   render();if(dirty)changed();if(options.viewer&&root.PicassoEmotion){if(!emotion){viewerChart=root.PicassoEmotion.mount(emotionHost,{title:'Người xem chấm',viewerOnly:true,updated:value=>{viewerRatings=value.ratings||{};emotion?.set({cards:ordered(cards),ratings:viewerRatings,selected:selected?.id});},read:async()=>({cards:ordered(cards),...await options.viewer(project)}),grade:async()=>{await save();await options.grade(project,null);await emotion.refresh();}});emotion=root.PicassoEmotion.mount(emotionHost,{title:'Anh dự đoán',showGrade:false,updated:value=>viewerChart?.set({cards:ordered(cards),ratings:value.ratings||{},selected:selected?.id}),read:async()=>{const v=await options.viewer(project);viewerRatings=v.ratings||{};return{cards:ordered(cards),...v};},grade:async()=>{await save();await options.grade(project,null);},change:(id,value)=>{const c=cards.find(c=>c.id===id);if(c){c.prediction=value;changed();}},select:id=>{selected=cards.find(c=>c.id===id);viewerChart?.set({cards:ordered(cards),ratings:viewerRatings,selected:id});}});}await emotion.refresh();await viewerChart.refresh();}add.disabled=done.disabled=false;back?.focus();
+   render();if(dirty)changed();if(options.viewer&&root.PicassoEmotion){if(!viewerChart){viewerChart=root.PicassoEmotion.mount(emotionHost,{title:'Người xem chấm',viewerOnly:true,updated:value=>{viewerRatings=value.ratings||{};emotion?.set({cards:ordered(cards),ratings:viewerRatings,selected:selected?.id});},read:async()=>({cards:ordered(cards),...await options.viewer(project)}),grade:async()=>{await save();await options.grade(project,null);await viewerChart.refresh();}});}await viewerChart.refresh();}add.disabled=done.disabled=false;back?.focus();
   }catch(error){status.textContent=error.message;if(options.retryOpen){active=false;throw error;}}
  }
  function close(){cancelCardTap();viewerChart?.stop();emotion?.stop();hideDialog();page.hidden=true;active=false;document.body.classList.remove('memory-open');save().catch(()=>{});returnFocus?.focus();options.closed?.();}
