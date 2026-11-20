@@ -29,7 +29,13 @@ function mount(opts){
  const head=make('header',undefined,'sp-head'),status=make('span','','sp-status');status.setAttribute('role','status');
  const scoreAll=button('Chấm cả kịch bản',()=>scoreWhole().catch(e=>opts.toast(e.message)),'Chấm cả kịch bản','sp-score-all');
  const done=button('Xong',()=>exitFocus(),'Thoát chế độ viết tập trung','sp-done');
- head.append(make('h2','Kịch bản'),status,scoreAll,done);
+ const copyBtn=button('Copy',()=>copyScript(),'Chép cả kịch bản','sp-copy');
+ head.append(make('h2','Kịch bản'),status,scoreAll,copyBtn,done);
+ /* Chép cả kịch bản thành chữ thường: tiêu đề khối, mỗi dòng kèm nhãn [V.O] [Motion]... */
+ function scriptText(){const label=Object.fromEntries(MARKS);return blocks.map(b=>[b.title.trim(),...b.lines.filter(l=>l.text.trim()).map(l=>(l.mark?'['+label[l.mark]+'] ':'')+l.text.trim())].filter(Boolean).join('\n')).filter(Boolean).join('\n\n');}
+ async function copyScript(){const text=scriptText();if(!text){opts.toast('Chưa có chữ nào để chép.');return;}
+  try{await navigator.clipboard.writeText(text);}catch(e){const t=make('textarea');t.value=text;t.style.cssText='position:fixed;opacity:0';document.body.append(t);t.select();const ok=document.execCommand('copy');t.remove();if(!ok){opts.toast('Không chép được, trình duyệt chặn.');return;}}
+  copyBtn.textContent='Đã chép ✓';setTimeout(()=>{copyBtn.textContent='Copy';},1500);}
  const empty=make('p','Chưa có kịch bản. Bấm ✍ Viết trên một thẻ để chép chữ của thẻ vào đây, hoặc bấm ＋ Khối mới để viết tự do.','sp-empty');
  const page=make('div',undefined,'sp-page'),addFree=button('＋ Khối mới',()=>{const b=newBlock();blocks.push(b);render();touched();focusTitle(b);},'Thêm khối viết tự do','sp-add');
  const barWrap=make('div',undefined,'sp-barwrap'),bar=make('div',undefined,'sp-bar');bar.setAttribute('role','toolbar');bar.setAttribute('aria-label','Nhãn dòng kịch bản');

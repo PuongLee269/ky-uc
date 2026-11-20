@@ -83,3 +83,6 @@ body.sp-focus .script-host{padding-bottom:64px}
 .memory-workspace>.memory-chart-host[hidden]{display:none!important}
 .memory-toolbar button[aria-pressed=true]{background:#fff1d9;border-color:#d7ae69}
 .sp-barwrap[hidden]{display:none!important}
+.memory-page .sp-copy{display:none}
+body.sp-focus .memory-page .sp-copy{display:block;min-height:34px;padding:4px 14px;border:1px solid #e3d3b5;border-radius:99px;background:#fff;color:#6b4a14;font-weight:700;font-size:13px;margin-left:auto}
+body.sp-focus .memory-page .sp-copy+.sp-done{margin-left:0}
