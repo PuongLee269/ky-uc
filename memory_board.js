@@ -35,22 +35,48 @@ function mount(options){
  const make=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
  const button=(text,fn,label)=>{const b=make('button',text);b.type='button';b.onclick=fn;if(label)b.setAttribute('aria-label',label);return b;};
  const page=make('section',undefined,'memory-page');page.hidden=true;page.addEventListener('pointerdown',e=>{if(e.target.closest('button'))cancelCardTap();});page.setAttribute('aria-label','Vùng Ký Ức');
- const toolbar=make('header',undefined,'memory-toolbar'),back=options.persistent?null:button(options.backLabel||'← Sáng tạo',close),heading=make('h1',options.title||'Vùng Ký Ức');
+ const toolbar=make('header',undefined,'memory-toolbar'),back=options.persistent?null:button(options.backLabel||'← Sáng tạo',close),heading=options.heading||make('h1',options.title||'Vùng Ký Ức');
  const add=button('＋',()=>openIcons(null),'Thêm thẻ ký ức'),done=button(options.actionLabel||'Hoàn thành',async()=>{done.disabled=true;try{await save();await options.action(project,ordered(cards));}catch(e){status.textContent=e.message;}finally{done.disabled=false;}});add.className='memory-add';done.className='memory-done';done.hidden=!options.action;
- const chartBtn=button('📈 Người xem chấm',()=>toggleChart());chartBtn.setAttribute('aria-pressed','false');chartBtn.hidden=!options.viewer;
- toolbar.append(...(back?[back]:[]),heading,...(options.toolbar||[]),chartBtn,add,done);
- const hint=make('p',options.doubleClickOpen?'Bấm thẻ để ghi chú · Bấm đúp thẻ để xem thẻ con · Bấm đúp vùng trống để thêm thẻ':'Nhấp đúp vùng trống để thêm thẻ · Kéo thẻ để xếp chuyện · Chạm thẻ để ghi chú','memory-hint');
- const status=make('p','', 'memory-status');status.setAttribute('role','status');
+ const chartBtn=button('📈 Người xem chấm',()=>{closeMenu(true);toggleChart();});chartBtn.className='memory-menu-item';chartBtn.setAttribute('role','menuitem');chartBtn.setAttribute('aria-pressed','false');chartBtn.hidden=!options.viewer;
+ /* Menu ⋯: các việc ít dùng (Dựng tinh, Cài đặt, Người xem chấm, chạy lại…). options.menu() trả về danh sách {label,run|href,disabled}; {chart:true} là chỗ của Người xem chấm. */
+ const moreBtn=button('⋯',()=>{if(menu.hidden)openMenu();else closeMenu(true);},'Thêm tùy chọn');moreBtn.className='memory-more-btn';moreBtn.setAttribute('aria-haspopup','menu');moreBtn.setAttribute('aria-expanded','false');
+ const menu=make('div',undefined,'memory-menu');menu.setAttribute('role','menu');menu.hidden=true;
+ const moreWrap=make('span',undefined,'memory-more');moreWrap.append(moreBtn,menu);
+ function menuItem(item){
+  if(item.chart)return chartBtn;
+  const node=item.href?make('a',item.label):button(item.label,()=>{closeMenu(true);item.run?.();});
+  if(item.href){node.href=item.href;node.onclick=()=>closeMenu();}
+  node.className='memory-menu-item';node.setAttribute('role','menuitem');if(item.disabled)node.disabled=true;
+  return node;
+ }
+ const menuNodes=()=>[...menu.children].filter(n=>!n.disabled);
+ function openMenu(){
+  const items=(options.menu?options.menu():[{chart:true}]).filter(i=>!i.chart||options.viewer);
+  menu.replaceChildren(...items.map(menuItem));menu.hidden=false;moreBtn.setAttribute('aria-expanded','true');menuNodes()[0]?.focus();
+ }
+ function closeMenu(refocus){if(menu.hidden)return;menu.hidden=true;moreBtn.setAttribute('aria-expanded','false');if(refocus)moreBtn.focus();}
+ menu.addEventListener('keydown',e=>{
+  const nodes=menuNodes(),i=nodes.indexOf(document.activeElement);
+  if(e.key==='ArrowDown'){e.preventDefault();nodes[(i+1)%nodes.length]?.focus();}
+  else if(e.key==='ArrowUp'){e.preventDefault();nodes[(i<=0?nodes.length:i)-1]?.focus();}
+  else if(e.key==='Home'){e.preventDefault();nodes[0]?.focus();}
+  else if(e.key==='End'){e.preventDefault();nodes[nodes.length-1]?.focus();}
+  else if(e.key==='Tab')closeMenu(true);
+ });
+ page.addEventListener('pointerdown',e=>{if(!menu.hidden&&!moreWrap.contains(e.target))closeMenu();});
+ toolbar.append(...(back?[back]:[]),heading,...(options.toolbar||[]),moreWrap,add,done);
+ const hint=make('p',options.doubleClickOpen?'Bấm thẻ để ghi chú · Bấm đúp thẻ để xem thẻ con · Bấm đúp vùng trống để thêm thẻ':'Nhấp đúp vùng trống để thêm thẻ · Kéo thẻ để xếp chuyện · Chạm thẻ để ghi chú','memory-hint');hint.hidden=true;  // chỉ hiện khi bảng chưa có thẻ
+ const status=make('p','', 'memory-status');status.setAttribute('role','status');const statusRow=make('div',undefined,'memory-statusrow');statusRow.append(status,...(options.statusExtra||[]));
  const viewport=make('div',undefined,'memory-viewport');viewport.tabIndex=0;viewport.setAttribute('aria-label','Không gian sắp xếp thẻ. Cuộn hoặc kéo nền để di chuyển.');
  const surface=make('div',undefined,'memory-surface');viewport.append(surface);
  const guideX=make('div',undefined,'memory-guide vertical'),guideY=make('div',undefined,'memory-guide horizontal');guideX.hidden=guideY.hidden=true;
  const empty=make('div','Một câu chuyện bắt đầu từ một ký ức.\nBấm ＋ để tạo thẻ đầu tiên.','memory-empty');
  const emotionHost=make('div',undefined,'memory-chart-host');emotionHost.hidden=true;
  function toggleChart(force){const show=force??emotionHost.hidden;emotionHost.hidden=!show;chartBtn.setAttribute('aria-pressed',String(show));if(show)viewerChart?.refresh().catch(()=>{});}
- emotionHost.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();toggleChart(false);chartBtn.focus();}});const workspace=make('div',undefined,'memory-workspace');workspace.append(viewport,emotionHost);if(options.below){workspace.classList.add('has-script');workspace.append(options.below);}page.append(toolbar,hint,status,workspace);document.body.append(page);
+ emotionHost.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();toggleChart(false);moreBtn.focus();}});const workspace=make('div',undefined,'memory-workspace');workspace.append(viewport,emotionHost);if(options.below){workspace.classList.add('has-script');workspace.append(options.below);}page.append(toolbar,hint,statusRow,workspace);document.body.append(page);
  const shade=make('div',undefined,'memory-shade');shade.hidden=true;const dialog=make('section',undefined,'memory-dialog');dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');shade.append(dialog);page.append(shade);
  let cards=[],baseCards=[],version=0,project=null,dirty=false,revision=0,timer=null,saveQueue=Promise.resolve(),active=false,pointerEditing=false,selected=null,lastFocus=null,returnFocus=null,noteEditor=null,backdropStarted=false;
- let emotion=null,viewerChart=null,viewerRatings={},cardTap=null,lastDouble=null;
+ let loaded=false,emotion=null,viewerChart=null,viewerRatings={},cardTap=null,lastDouble=null;
  function cancelCardTap(){if(cardTap){clearTimeout(cardTap.timer);cardTap=null;}}
  function clickCard(card){
   if(!options.doubleClickOpen){openCard(card);return;}
@@ -94,7 +120,7 @@ function mount(options){
  if(options.persistent){page.hidden=false;document.body.classList.add('memory-open');status.textContent='Đang tải dự án…';add.disabled=true;}
  async function open(){
   if(active)return;returnFocus=document.activeElement;page.hidden=false;active=true;document.body.classList.add('memory-open');status.textContent='Đang tải…';add.disabled=done.disabled=true;
-  try{const value=await options.load();project=value.project;version=value.board.version;cards=structuredClone(value.board.cards);baseCards=structuredClone(value.board.cards);dirty=false;
+  try{const value=await options.load();loaded=true;project=value.project;version=value.board.version;cards=structuredClone(value.board.cards);baseCards=structuredClone(value.board.cards);dirty=false;
    let cached;try{cached=JSON.parse(localStorage.getItem(storageKey(project))||'null');}catch(e){}
    if(cached?.dirty&&Array.isArray(cached.cards)){
     if(options.merge){const m=options.merge(cached.baseCards||null,cached.cards,value.board.cards);cards=m.items;baseCards=structuredClone(value.board.cards);if(m.conflicts)conflictNote(m.conflicts);}
@@ -111,7 +137,7 @@ function mount(options){
  function orderBadges(){for(const [i,card] of ordered(cards).entries()){const n=surface.querySelector('[data-order="'+card.id+'"]');if(n)n.textContent=String(i+1).padStart(2,'0');}emotion?.set({cards:ordered(cards),ratings:viewerRatings,selected:selected?.id});viewerChart?.set({cards:ordered(cards),ratings:viewerRatings,selected:selected?.id});}
  function render(){surface.replaceChildren();surface.append(empty,guideX,guideY);
   if(options.technical){const technical=button('📦 Cài đặt kỹ thuật',()=>options.technical(),'Cài đặt kỹ thuật');technical.className='memory-technical';surface.append(technical);}
-empty.hidden=!!cards.length;guideX.hidden=guideY.hidden=true;
+empty.hidden=!!cards.length;hint.hidden=!!cards.length;guideX.hidden=guideY.hidden=true;
   for(const card of cards){
    const icon=iconFor(card.icon),node=make('div',undefined,'memory-card');node.dataset.card=card.id;node.style.left=card.x+'px';node.style.top=(card.y+(options.technical?70:0))+'px';node.tabIndex=0;node.setAttribute('role','button');node.setAttribute('aria-label',icon.name+' · '+(card.label||'Chưa có nhãn')+' · '+(card.caption||'Chạm để ghi chú'));
    const order=make('span',undefined,'memory-order');order.dataset.order=card.id;
@@ -119,7 +145,7 @@ empty.hidden=!!cards.length;guideX.hidden=guideY.hidden=true;
    const glyph=make('img',undefined,'memory-card-art');loadArt(glyph,icon.image);glyph.alt='';glyph.draggable=false;node.classList.add('memory-art-card');const caption=make('span',card.caption||'Chạm để ghi chú','memory-caption');
    const editNote=button('✎',()=>options.editNote?options.editNote(project,structuredClone(card)):openNote(card),'Ghi chú thẻ '+icon.name);editNote.className='memory-edit-note';
    const changeIcon=button('◇',()=>openIcons(card),'Đổi icon thẻ '+icon.name);changeIcon.className='memory-change-icon';
-   node.append(order,label,glyph,caption,editNote,changeIcon);if(card.source==='script'){const b=make('span','từ kịch bản','memory-script-badge');b.title='Thẻ tự tạo từ dòng đã đánh nhãn trong kịch bản';node.append(b);}if(options.cardAction){const w=button(options.cardAction.label,()=>options.cardAction.run(structuredClone(card)),options.cardAction.aria);w.className='memory-write';node.append(w);}if(options.applications){const scope=button(options.applications[card.scope||'ai']||options.applications.ai,()=>openLabels(card),'Phạm vi áp dụng của thẻ');scope.className='memory-scope';node.append(scope);}surface.append(node);
+   node.append(order,label,glyph,caption,editNote,changeIcon);if(options.cardAction)node.classList.add('memory-has-write');if(card.source==='script'){const b=make('span','từ kịch bản','memory-script-badge');b.title='Thẻ tự tạo từ dòng đã đánh nhãn trong kịch bản';node.append(b);}if(options.cardAction){const w=button(options.cardAction.label,()=>options.cardAction.run(structuredClone(card)),options.cardAction.aria);w.className='memory-write';node.append(w);}if(options.applications){const scope=button(options.applications[card.scope||'ai']||options.applications.ai,()=>openLabels(card),'Phạm vi áp dụng của thẻ');scope.className='memory-scope';node.append(scope);}surface.append(node);
    let drag=null,suppressTap=false;
    node.onpointerdown=e=>{if(e.target.closest('button')||e.button!==0)return;pointerEditing=true;suppressTap=false;drag={id:e.pointerId,x:e.clientX,y:e.clientY,startX:card.x,startY:card.y,moved:false};node.setPointerCapture(e.pointerId);};
    node.onpointermove=e=>{if(!drag||e.pointerId!==drag.id)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(!drag.moved&&Math.hypot(dx,dy)<6)return;drag.moved=true;cancelCardTap();node.classList.add('dragging');
@@ -177,7 +203,7 @@ empty.hidden=!!cards.length;guideX.hidden=guideY.hidden=true;
  shade.onpointerdown=e=>{backdropStarted=e.target===shade;};
  shade.onpointercancel=()=>{backdropStarted=false;};
  shade.onclick=e=>{const dismiss=backdropStarted&&e.target===shade;backdropStarted=false;if(dismiss)hideDialog();};
- page.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();if(!shade.hidden)hideDialog();else if(!options.persistent)close();return;}if(e.key==='Tab'&&!shade.hidden){const nodes=[...dialog.querySelectorAll('button,input,textarea,select')].filter(n=>!n.disabled&&!n.hidden);if(!nodes.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
+ page.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();if(!menu.hidden)closeMenu(true);else if(!shade.hidden)hideDialog();else if(!options.persistent)close();return;}if(e.key==='Tab'&&!shade.hidden){const nodes=[...dialog.querySelectorAll('button,input,textarea,select')].filter(n=>!n.disabled&&!n.hidden);if(!nodes.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
  function openIcons(card,newPosition=null){
   selected=card;const host=showDialog(card?'Đổi hình':'Chọn hình cho thẻ mới');const search=make('input');search.type='search';search.placeholder='Tìm thẻ: nhà, mắt, kiếm, quýt…';search.setAttribute('aria-label','Tìm icon');const grid=make('div',undefined,'memory-icon-grid');host.append(search,grid);
   function results(){grid.replaceChildren();const term=fold(search.value);for(const icon of ICONS.filter(i=>!i.legacyOnly&&fold(i.name+' '+i.keywords).includes(term))){let choiceStarted=false;const b=button('',event=>{if(event?.isTrusted&&event.detail>0&&!choiceStarted)return;choiceStarted=false;if(selected){selected.icon=icon.id;}else{let x=newPosition?.x??Math.round((viewport.scrollLeft+32)/24)*24,y=newPosition?.y??Math.round((viewport.scrollTop+32)/24)*24;while(cards.some(c=>Math.abs(c.x-x)<W&&Math.abs(c.y-y)<H)){x+=W+GAP;if(x>viewport.scrollLeft+Math.max(viewport.clientWidth-W,160)){x=Math.round((viewport.scrollLeft+32)/24)*24;y+=H+GAP;}}cards.push({id:crypto.randomUUID(),icon:icon.id,label:'',caption:'',x:Math.min(5800,x),y:Math.min(5800,y),...(options.applications?{scope:'ai'}:{})});}changed();hideDialog();render();},icon.name);b.onpointerdown=()=>{choiceStarted=true;};b.onpointercancel=()=>{choiceStarted=false;};const art=make('img',undefined,'memory-picker-art');loadArt(art,icon.image);art.alt='';art.loading='lazy';art.draggable=false;b.append(art,make('small',icon.name));grid.append(b);}if(!grid.children.length)grid.append(make('p','Không tìm thấy icon.'));}
@@ -213,7 +239,7 @@ empty.hidden=!!cards.length;guideX.hidden=guideY.hidden=true;
  }
  window.addEventListener('beforeunload',e=>{commitNote();if(dirty){local();e.preventDefault();e.returnValue='';}});
  function reveal(id){const n=surface.querySelector('[data-card="'+id+'"]');if(!n)return false;n.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});n.classList.add('memory-flash');setTimeout(()=>n.classList.remove('memory-flash'),1500);return true;}
- return {open,reopen:async()=>{if(project)await save().catch(()=>{});active=false;return open();},close,reveal,flush:()=>save(),isDirty:()=>dirty,refresh:async()=>{if(options.reconcile)await save();const value=await options.load();if(value.project===project){cards=structuredClone(value.board.cards);version=value.board.version;if(options.reconcile){baseCards=structuredClone(cards);dirty=false;local();}render();await emotion?.refresh();}}};
+ return {count:()=>loaded?cards.length:null,open,reopen:async()=>{if(project)await save().catch(()=>{});active=false;return open();},close,reveal,flush:()=>save(),isDirty:()=>dirty,refresh:async()=>{if(options.reconcile)await save();const value=await options.load();if(value.project===project){cards=structuredClone(value.board.cards);version=value.board.version;if(options.reconcile){baseCards=structuredClone(cards);dirty=false;local();}render();await emotion?.refresh();}}};
 }
 const api={mount,ICONS,LABELS,ordered,snap};if(typeof module==='object'&&module.exports)module.exports=api;else root.PicassoMemoryBoard=api;
 })(typeof window==='undefined'?globalThis:window);

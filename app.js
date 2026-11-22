@@ -250,19 +250,20 @@ function showGuide(){
 }
 
 /* ---------- gắn Vùng Ký Ức và Kịch bản ---------- */
-const offlineOnly=what=>()=>{throw new Error(what+' cần máy tính, bản này chưa dùng được.');};
+/* Đã cài rồi thì không hiện "Cài app". Chưa cài: hiện khi có hộp cài của trình duyệt, hoặc trên điện thoại (có hướng dẫn Android / iPhone). */
+const isInstalled=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+function canInstall(){
+ if(isInstalled())return false;
+ if(installPrompt)return true;
+ return /iphone|ipad|ipod|android/i.test(navigator.userAgent||'')||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+}
 
 function buildUi(){
  const projectButton=button('📁 …',showProjects,'memory-link ky-project');
- const gear=button('⚙',showSettings,'memory-link');gear.setAttribute('aria-label','Cài đặt');
- const install=button('Cài app',installMobileApp,'memory-link');
- install.hidden=matchMedia('(display-mode: standalone)').matches || navigator.standalone===true;
- const help=button('?',showGuide,'memory-link');help.setAttribute('aria-label','Hướng dẫn');
  const script=PicassoScriptPage.mount({
   saveDelay:SAVE_DELAY_MS,
   save:async(project,version,blocks)=>{const r=store.save(project,'screen',version,blocks);scheduleSync(SYNC_DEBOUNCE_MS);return {version:r.version,blocks:r.items};},
   load:async()=>{const v=store.view(current,'screen');return {version:v.version,blocks:v.items};},
-  score:offlineOnly('Chấm kịch bản'),
   cardText:id=>{const c=store.get(current)?.board.cards.find(x=>x.id===id);return c?String(c.caption||''):null;},
   cardInfo:async card=>({title:String(card.caption||'').split(/\r?\n/)[0].slice(0,60),text:String(card.caption||'')}),
   reveal:id=>board.reveal(id),
@@ -274,7 +275,9 @@ function buildUi(){
   saveDelay:SAVE_DELAY_MS,
   below:script.el,
   cardAction:{label:'✍ Viết',aria:'Viết kịch bản cho thẻ này',run:card=>script.write(card)},
-  toolbar:[projectButton,chip,gear,help,install],
+  toolbar:[projectButton],
+  statusExtra:[chip],
+  menu:()=>[{label:'⚙ Cài đặt',run:showSettings},{label:'? Hướng dẫn',run:showGuide},...(canInstall()?[{label:'Cài app',run:installMobileApp}]:[]),...script.menuItems()],
   storageScope:()=>'local',
   load:async()=>{const v=store.view(current,'board');return {project:current,board:{version:v.version,cards:v.items}};},
   save:async(project,version,cards)=>{const r=store.save(project,'board',version,cards);scheduleSync(SYNC_DEBOUNCE_MS);return {version:r.version,cards:r.items};},

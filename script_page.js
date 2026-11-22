@@ -27,36 +27,81 @@ function onHold(target,fire,busyNow){
 function mount(opts){
  const el=make('section',undefined,'script-host');el.setAttribute('aria-label','Kịch bản');
  const head=make('header',undefined,'sp-head'),status=make('span','','sp-status');status.setAttribute('role','status');
- const scoreAll=button('Chấm cả kịch bản',()=>scoreWhole().catch(e=>opts.toast(e.message)),'Chấm cả kịch bản','sp-score-all');
+ const has=name=>typeof opts[name]==='function';
+ const setStatus=text=>{status.textContent=text;status.title=text;};
  const done=button('Xong',()=>exitFocus(),'Thoát chế độ viết tập trung','sp-done');
  const copyBtn=button('Copy',()=>copyScript(),'Chép cả kịch bản','sp-copy');
- const makeKids=button('🧩 Tạo thẻ con từ kịch bản',()=>makeChildren().catch(e=>opts.toast(e.message)),'Tạo thẻ con từ các dòng đã đánh nhãn','sp-children');makeKids.hidden=typeof opts.makeChildren!=='function';
- head.append(make('h2','Kịch bản'),status,scoreAll,copyBtn,makeKids,done);
+ /* Một lối đi: Viết › Nhãn › Thẻ con › Chấm › Dựng. Bước nào chưa có chức năng thì bỏ khỏi dòng. */
+ const STEPS={write:'Viết',label:'Nhãn',kids:'Thẻ con',score:'Chấm',draft:'Dựng'};
+ const titleBox=make('div',undefined,'sp-titlebox'),steps=make('ol',undefined,'sp-steps');steps.setAttribute('aria-label','Các bước làm kịch bản');
+ const nextBtn=button('',()=>nextAction?.(),undefined,'sp-next'),nextHint=make('span','','sp-hint');
+ titleBox.append(make('h2','Kịch bản'),status);head.append(titleBox,steps,nextBtn,nextHint,copyBtn,done);
+ let nextAction=null,lastSig='',kidsBusy=false;
+ const kidsKey=()=>'picassoScriptKids:'+pid;
+ const kidsHash=()=>{try{return localStorage.getItem(kidsKey())||'';}catch(e){return '';}};
+ const saveKidsHash=h=>{try{localStorage.setItem(kidsKey(),h);}catch(e){}};
+ const hasText=()=>blocks.some(b=>b.title.trim()||blockText(b).trim());
+ const markedKey=()=>blocks.flatMap(b=>b.lines.filter(l=>l.mark&&l.text.trim()).map(l=>l.mark+':'+l.text.trim())).join('\n');
+ const freshScored=()=>{const need=blocks.filter(b=>b.title.trim()||blockText(b).trim());return need.length>0&&need.every(b=>{const r=ratings['sp_'+b.id];return r&&r.status==='scored'&&!r.stale;});};
+ const fail=e=>opts.toast(e.message);
+ function computeNext(){
+  if(!hasText())return {step:'write',label:'＋ Viết đoạn đầu',run:startWriting};
+  const marked=markedKey();
+  if(!marked)return {step:'label',hint:'Chạm đúp một dòng để gắn nhãn.'};
+  if(has('makeChildren')&&(kidsBusy||hashText(marked)!==kidsHash()))return {step:'kids',label:kidsBusy?'Đang tạo…':'🧩 Tạo thẻ con',disabled:kidsBusy,run:()=>makeChildren().catch(fail)};
+  if(has('score')&&!freshScored())return {step:'score',label:busy?'Đang chấm…':'Chấm kịch bản',disabled:busy,run:()=>scoreWhole().catch(fail)};
+  if(has('draft'))return {step:'draft',label:'Dựng Draft',run:()=>opts.draft()};
+  return {step:has('score')?'score':has('makeChildren')?'kids':'label'};
+ }
+ function paintNext(){
+  const list=['write','label',...(has('makeChildren')?['kids']:[]),...(has('score')?['score']:[]),...(has('draft')?['draft']:[])],n=computeNext();
+  nextAction=n.run||null;
+  const sig=JSON.stringify([list,n.step,n.label,n.disabled,n.hint]);if(sig===lastSig)return;lastSig=sig;
+  steps.replaceChildren(...list.map(k=>{const li=make('li',STEPS[k]);if(k===n.step)li.setAttribute('aria-current','step');return li;}));
+  nextBtn.hidden=!n.label;nextBtn.textContent=n.label||'';nextBtn.disabled=Boolean(n.disabled);nextHint.hidden=!n.hint;nextHint.textContent=n.hint||'';
+ }
+ /* Việc chạy lại các bước nằm trong menu ⋯ của Vùng Ký Ức. */
+ function menuItems(){
+  const out=[];
+  if(has('makeChildren'))out.push({label:'🧩 Tạo lại thẻ con',disabled:kidsBusy,run:()=>makeChildren().catch(fail)});
+  if(has('score'))out.push({label:'Chấm lại kịch bản',disabled:busy,run:()=>scoreWhole().catch(fail)});
+  return out;
+ }
  /* Thẻ con được tạo từ các dòng đã đánh nhãn; thẻ Anh tự tạo giữ nguyên. */
  async function makeChildren(){
+  if(kidsBusy)return;
   const marked=blocks.reduce((n,b)=>n+b.lines.filter(l=>l.mark&&l.text.trim()).length,0);
   if(!marked){opts.toast('Chưa có dòng nào được đánh nhãn V.O / Motion / Tư liệu / Quay.');return;}
   const parents=new Set(blocks.filter(b=>b.card_id&&b.lines.some(l=>l.mark&&l.text.trim())).map(b=>b.card_id)).size+blocks.filter(b=>!b.card_id&&b.lines.some(l=>l.mark&&l.text.trim())).length;
   if(!root.confirm('Sẽ tạo/cập nhật thẻ con cho '+parents+' thẻ lớn từ '+marked+' dòng đã đánh nhãn. Thẻ con Anh tự tạo được giữ nguyên.'))return;
-  await saveScreenplay();
-  const r=await opts.makeChildren(pid);
-  opts.toast('Thẻ con: tạo '+r.created+', cập nhật '+r.updated+', xóa '+r.removed+(r.new_big_cards?' · thẻ lớn mới '+r.new_big_cards:'')+'.');
-  sync(await opts.load());
+  kidsBusy=true;paintNext();
+  try{
+   await saveScreenplay();
+   const hash=hashText(markedKey());
+   const r=await opts.makeChildren(pid);
+   saveKidsHash(hash);
+   opts.toast('Thẻ con: tạo '+r.created+', cập nhật '+r.updated+', xóa '+r.removed+(r.new_big_cards?' · thẻ lớn mới '+r.new_big_cards:'')+'.');
+   sync(await opts.load());
+  }finally{kidsBusy=false;paintNext();}
  }
  /* Chép cả kịch bản thành chữ thường: tiêu đề khối, mỗi dòng kèm nhãn [V.O] [Motion]... */
  function scriptText(){const label=Object.fromEntries(MARKS);return blocks.map(b=>[b.title.trim(),...b.lines.filter(l=>l.text.trim()).map(l=>(l.mark?'['+label[l.mark]+'] ':'')+l.text.trim())].filter(Boolean).join('\n')).filter(Boolean).join('\n\n');}
  async function copyScript(){const text=scriptText();if(!text){opts.toast('Chưa có chữ nào để chép.');return;}
   try{await navigator.clipboard.writeText(text);}catch(e){const t=make('textarea');t.value=text;t.style.cssText='position:fixed;opacity:0';document.body.append(t);t.select();const ok=document.execCommand('copy');t.remove();if(!ok){opts.toast('Không chép được, trình duyệt chặn.');return;}}
   copyBtn.textContent='Đã chép ✓';setTimeout(()=>{copyBtn.textContent='Copy';},1500);}
- const empty=make('p','Chưa có kịch bản. Bấm ✍ Viết trên một thẻ để chép chữ của thẻ vào đây, hoặc bấm ＋ Khối mới để viết tự do.','sp-empty');
+ const empty=make('p','Bấm ✍ Viết trên một thẻ để chép chữ của thẻ vào đây, hoặc bấm Viết đoạn đầu để viết tự do.','sp-empty');
  const page=make('div',undefined,'sp-page'),addFree=button('＋ Khối mới',()=>{const b=newBlock();blocks.push(b);render();touched();focusTitle(b);},'Thêm khối viết tự do','sp-add');
  const barWrap=make('div',undefined,'sp-barwrap'),bar=make('div',undefined,'sp-bar');bar.setAttribute('role','toolbar');bar.setAttribute('aria-label','Nhãn dòng kịch bản');
  const chips=MARKS.map(([mark,label])=>{const b=button(label,()=>{const line=markTarget();if(line)toggleMark(line,mark);else opts.toast('Chạm vào một dòng trước khi gán nhãn.');},'Gán nhãn '+label+' cho dòng đang viết','sp-chip');b.dataset.mark=mark;b.setAttribute('aria-pressed','false');b.onpointerdown=e=>e.preventDefault();return b;});
  bar.append(...chips);barWrap.append(bar);const conflictBar=make('p','','sp-conflict');conflictBar.hidden=true;conflictBar.setAttribute('role','alert');
- el.append(head,conflictBar,empty,page,addFree,barWrap);
+ const labelHint=make('p','Chạm đúp để gắn nhãn V.O · Motion · Tư liệu · Quay','sp-labelhint');labelHint.hidden=true;
+ el.append(head,conflictBar,empty,page,addFree,barWrap,labelHint);addFree.hidden=true;
  /* Thanh 4 nhãn ẩn sẵn; chạm đúp vào khối kịch bản mới hiện (thoát Xong thì ẩn lại). */
  barWrap.hidden=true;let lastTap=0;
- function showBar(){if(!barWrap.hidden)return;barWrap.hidden=false;keyboard();requestAnimationFrame(keepCaret);}
+ /* Gợi ý nhãn chỉ hiện khi đang viết và thanh nhãn còn ẩn; sau lần chạm đúp đầu tiên thì không hiện nữa (nhớ theo thiết bị). */
+ const BAR_SEEN_KEY='picassoScriptLabelBarSeen';let barSeen=false;try{barSeen=localStorage.getItem(BAR_SEEN_KEY)==='1';}catch(e){}
+ function paintHint(){labelHint.hidden=!(focusOn&&barWrap.hidden&&!barSeen);if(!labelHint.hidden)keyboard();}
+ function showBar(){if(!barWrap.hidden)return;if(!barSeen){barSeen=true;try{localStorage.setItem(BAR_SEEN_KEY,'1');}catch(e){}}barWrap.hidden=false;paintHint();keyboard();requestAnimationFrame(keepCaret);}
  page.addEventListener('pointerup',e=>{if(e.button>0)return;const now=e.timeStamp;if(now-lastTap<350)showBar();lastTap=now;});
  page.addEventListener('dblclick',showBar);
  let pid=null,version=0,blocks=[],ratings={},busy=false,rev=0,dirty=false,timer=null,inflight=Promise.resolve(),pollTimer=null,base=[],cur={block:null,line:null},titleBlock=null,lastLine=null,focusOn=false,drag=null;
@@ -67,21 +112,21 @@ function mount(opts){
  const nodeOf=id=>page.querySelector('[data-id="'+id+'"]');
  const staleText=b=>{if(!b.card_id)return null;const t=opts.cardText(b.card_id);return t!==null&&t!==undefined&&hashText(t)!==b.card_hash?t:null;};
 
- function touched(){rev++;dirty=true;cache();status.textContent='Đang lưu…';clearTimeout(timer);timer=setTimeout(()=>saveScreenplay().catch(()=>{}),opts.saveDelay||SAVE_DELAY);}
+ function touched(){rev++;dirty=true;cache();paintNext();setStatus('Đang lưu…');clearTimeout(timer);timer=setTimeout(()=>saveScreenplay().catch(()=>{}),opts.saveDelay||SAVE_DELAY);}
  /* Mọi thao tác lưu đi qua đây; bản nháp luôn có sẵn trong localStorage. */
  function saveScreenplay(){
   clearTimeout(timer);
   inflight=inflight.catch(()=>{}).then(async()=>{
    if(!dirty||!pid)return;
    for(let attempt=0;attempt<2;attempt++){
-    const sent=rev,project=pid,payload=structuredClone(blocks);status.textContent='Đang lưu…';
+    const sent=rev,project=pid,payload=structuredClone(blocks);setStatus('Đang lưu…');
     try{
      const value=await opts.save(project,version,payload);if(project!==pid)return;
-     version=value.version;base=payload;if(sent===rev)dirty=false;cache();status.textContent=dirty?'Đang lưu…':'Đã lưu';
+     version=value.version;base=payload;if(sent===rev)dirty=false;cache();setStatus(dirty?'Đang lưu…':'Đã lưu');
      sync(value);return;
     }catch(error){
      if(attempt===0&&await mergeLatest(error))continue;
-     status.textContent=error.message;cache();throw error;
+     setStatus(error.message);cache();throw error;
     }
    }
   });
@@ -101,7 +146,7 @@ function mount(opts){
   const n=blocks.filter(b=>String(b.title||'').startsWith(root.PicassoOffline?.COPY_PREFIX||'(bản trên máy) ')).length;
   conflictBar.hidden=!n;conflictBar.textContent=n?(root.PicassoOffline?.CONFLICT_BANNER||'Có đoạn sửa ở hai nơi — xem và xoá bản không cần'):'';
  }
- function mark(line,value){line.mark=value;const row=rows.get(line);if(!row)return;row.dataset.mark=value||'';const pill=row.querySelector('.sp-pill');pill.hidden=!value;pill.textContent=LABEL[value]||'';paintIndent(row);fit(row.querySelector('textarea'));}
+ function mark(line,value){line.mark=value;paintNext();const row=rows.get(line);if(!row)return;row.dataset.mark=value||'';const pill=row.querySelector('.sp-pill');pill.hidden=!value;pill.textContent=LABEL[value]||'';paintIndent(row);fit(row.querySelector('textarea'));}
  function paintIndent(row){const ta=row.querySelector('textarea'),pill=row.querySelector('.sp-pill');ta.style.textIndent=pill.hidden?'':(pill.offsetWidth+6)+'px';}
  function toggleMark(line,value){mark(line,line.mark===value?null:value);touched();refreshChips();}
  function refreshChips(){for(const c of chips)c.setAttribute('aria-pressed',String(cur.line?.mark===c.dataset.mark));}
@@ -132,7 +177,7 @@ function mount(opts){
  function buildLine(block,line){
   const row=make('div',undefined,'sp-line');rows.set(line,row);
   const pill=button('',()=>{mark(line,null);touched();refreshChips();},'Bỏ nhãn dòng','sp-pill');pill.tabIndex=-1;pill.onpointerdown=e=>e.preventDefault();
-  const ta=make('textarea');ta.rows=1;ta.value=line.text;ta.maxLength=20000;ta.spellcheck=false;ta.setAttribute('aria-label','Dòng kịch bản');
+  const ta=make('textarea');ta.rows=1;ta.value=line.text;ta.maxLength=20000;ta.spellcheck=false;ta.placeholder=block.lines.length===1?'Viết ở đây…':'';ta.setAttribute('aria-label','Dòng kịch bản');
   ta.oninput=()=>{line.text=ta.value;fit(ta);touched();};
   ta.onfocus=()=>{enterFocus();cur={block,line};lastLine=line;titleBlock=null;refreshChips();};
   ta.onkeydown=e=>lineKey(e,block,line,ta);
@@ -156,7 +201,7 @@ function mount(opts){
   side.append(slot,del);main.append(title,stale,lines);node.append(dot,main,side);paintBadge(block,slot);
   return node;
  }
- function render(){page.replaceChildren(...blocks.map(buildBlock));empty.hidden=blocks.length>0;paintConflict();requestAnimationFrame(()=>{page.querySelectorAll('.sp-line').forEach(paintIndent);page.querySelectorAll('textarea').forEach(fit);});}
+ function render(){page.replaceChildren(...blocks.map(buildBlock));empty.hidden=blocks.length>0;addFree.hidden=!blocks.length;paintConflict();paintNext();requestAnimationFrame(()=>{page.querySelectorAll('.sp-line').forEach(paintIndent);page.querySelectorAll('textarea').forEach(fit);});}
  function removeBlock(block){
   if(blockText(block).trim()&&!root.confirm('Xóa khối này khỏi kịch bản? Thẻ trong Vùng Ký Ức không bị ảnh hưởng.'))return;
   blocks=blocks.filter(b=>b!==block);if(cur.block===block)cur={block:null,line:null};render();touched();
@@ -177,12 +222,13 @@ function mount(opts){
  }
  function sync(view){
   if(!view)return;ratings=view.ratings||{};busy=Boolean(view.busy);
-  scoreAll.disabled=busy;scoreAll.textContent=busy?'Đang chấm…':'Chấm cả kịch bản';
+  paintNext();
   for(const b of blocks){const n=nodeOf(b.id);if(!n)continue;paintBadge(b,n.querySelector('.sp-slot'));n.querySelector('.sp-stale').hidden=staleText(b)===null;}
   clearTimeout(pollTimer);if(busy)pollTimer=setTimeout(()=>opts.load().catch(()=>{}),3000);
  }
  async function scoreWhole(){
   await saveScreenplay();
+  if(!has('score'))return;
   if(!blocks.some(b=>b.title.trim()||blockText(b).trim())){opts.toast('Chưa có chữ nào để chấm.');return;}
   await opts.score(pid);sync(await opts.load());
  }
@@ -191,11 +237,11 @@ function mount(opts){
  function enterFocus(){
   if(focusOn)return;focusOn=true;document.body.classList.add('sp-focus');
   try{history.pushState({spFocus:1},'');}catch(e){}
-  keyboard();
+  paintHint();keyboard();
  }
  function exitFocus(fromPop){
   if(!focusOn)return;focusOn=false;endDrag();document.body.classList.remove('sp-focus');
-  barWrap.hidden=true;document.activeElement?.blur?.();el.style.top=el.style.height=el.style.bottom=barWrap.style.top='';
+  barWrap.hidden=true;paintHint();document.activeElement?.blur?.();el.style.top=el.style.height=el.style.bottom=barWrap.style.top=labelHint.style.top='';
   if(fromPop!==true&&history.state?.spFocus){try{history.back();}catch(e){}}
  }
  root.addEventListener('popstate',()=>{if(focusOn)exitFocus(true);});
@@ -272,7 +318,7 @@ function mount(opts){
  }
 
  /* Thanh nhãn luôn nằm trên bàn phím điện thoại. */
- function keyboard(){const vv=root.visualViewport;if(!vv||!focusOn){el.style.top=el.style.height=el.style.bottom=barWrap.style.top='';return;}el.style.top=vv.offsetTop+'px';el.style.height=vv.height+'px';el.style.bottom='auto';barWrap.style.top=(vv.offsetTop+vv.height-barWrap.offsetHeight)+'px';keepCaret();}
+ function keyboard(){const vv=root.visualViewport;if(!vv||!focusOn){el.style.top=el.style.height=el.style.bottom=barWrap.style.top=labelHint.style.top='';return;}el.style.top=vv.offsetTop+'px';el.style.height=vv.height+'px';el.style.bottom='auto';barWrap.style.top=(vv.offsetTop+vv.height-barWrap.offsetHeight)+'px';labelHint.style.top=(vv.offsetTop+vv.height-labelHint.offsetHeight-8)+'px';keepCaret();}
  /* Giữ dòng đang gõ nằm trên thanh nhãn và bàn phím. */
  function keepCaret(){const a=document.activeElement;if(!focusOn||!a||!el.contains(a)||a.tagName!=='TEXTAREA')return;const box=el.getBoundingClientRect(),r=a.getBoundingClientRect(),limit=box.bottom-barWrap.offsetHeight-24;const atEnd=a.selectionStart>=a.value.length-1,lineH=parseFloat(getComputedStyle(a).lineHeight)||30;const target=atEnd?r.bottom:Math.min(r.bottom,r.top+lineH*2);if(target>limit)el.scrollTop+=target-limit;else if(r.top<box.top+60)el.scrollTop-=box.top+60-r.top;}
  el.addEventListener('input',()=>requestAnimationFrame(keepCaret));el.addEventListener('focusin',()=>setTimeout(keepCaret,300));
@@ -286,25 +332,42 @@ function mount(opts){
  }
  trackBottomBar();
 
- function reveal(id){const n=nodeOf(id);if(!n)return;n.scrollIntoView({block:'center',behavior:'smooth'});n.classList.add('sp-flash');setTimeout(()=>n.classList.remove('sp-flash'),1500);}
+ /* ✍ Viết: vào thẳng chế độ viết, con trỏ ở cuối dòng cuối của khối. */
+ function writeInto(block){
+  enterFocus();const line=block.lines[block.lines.length-1];focusLine(line);
+  rows.get(line)?.scrollIntoView({block:'center'});
+ }
+ /* Ô tạm giữ bàn phím mở trong lúc chờ lấy chữ của thẻ (lần chạm của ngón tay mới được phép mở bàn phím điện thoại). */
+ function keyboardProxy(){
+  const t=make('textarea');t.tabIndex=-1;t.setAttribute('aria-hidden','true');t.style.cssText='position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;border:0;padding:0;pointer-events:none';
+  document.body.append(t);try{t.focus({preventScroll:true});}catch(e){}return t;
+ }
+ /* Nút "＋ Viết đoạn đầu": dùng khối đầu nếu đã có, nếu chưa thì tạo khối trống rồi vào viết ngay trong lần chạm. */
+ function startWriting(){
+  let b=blocks[0];if(!b){b=newBlock();blocks.push(b);render();touched();}
+  enterFocus();nodeOf(b.id)?.querySelector('.sp-title')?.focus();
+ }
  async function write(card){
-  const found=blocks.find(b=>b.card_id===card.id);if(found){reveal(found.id);return;}
-  let info;try{info=await opts.cardInfo(card);}catch(e){opts.toast(e.message);return;}
+  const found=blocks.find(b=>b.card_id===card.id);if(found){writeInto(found);return;}
+  enterFocus();const proxy=keyboardProxy();
+  let info;try{info=await opts.cardInfo(card);}catch(e){proxy.remove();exitFocus();opts.toast(e.message);return;}
+  const again=blocks.find(b=>b.card_id===card.id);if(again){writeInto(again);proxy.remove();return;}
   const block={id:uid(),card_id:card.id,card_hash:hashText(info.text),title:info.title,lines:linesOf(info.text)};
   const at=blocks.indexOf(cur.block);blocks.splice(at<0?blocks.length:at+1,0,block);
-  render();touched();reveal(block.id);
+  render();touched();writeInto(block);proxy.remove();
  }
  function open(project,view){
-  pid=project;version=view.version;blocks=structuredClone(view.blocks||[]);base=structuredClone(blocks);dirty=false;cur={block:null,line:null};status.textContent=blocks.length?'Đã lưu':'';
+  pid=project;version=view.version;blocks=structuredClone(view.blocks||[]);base=structuredClone(blocks);dirty=false;cur={block:null,line:null};setStatus(blocks.length?'Đã lưu':'');
   let cached=null;try{cached=JSON.parse(localStorage.getItem(cacheKey())||'null');}catch(e){}
   if(cached?.dirty&&Array.isArray(cached.blocks)){
    const net=root.PicassoOffline;
    if(net)blocks=net.mergeBlocks(cached.base||null,cached.blocks,blocks).items;else{blocks=cached.blocks;version=cached.version;}
-   touched();status.textContent='Đã khôi phục bản chưa lưu trên thiết bị này.';
+   touched();setStatus('Đã khôi phục bản chưa lưu trên thiết bị này.');
   }
   render();sync(view);
  }
- return {el,open,sync,write,saveScreenplay,isDirty:()=>dirty};
+ paintNext();
+ return {el,open,sync,write,saveScreenplay,menuItems,hasText,isDirty:()=>dirty};
 }
 const api={mount,hashText};if(typeof module==='object'&&module.exports)module.exports=api;else root.PicassoScriptPage=api;
 })(typeof window==='undefined'?globalThis:window);

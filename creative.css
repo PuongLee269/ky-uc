@@ -60,3 +60,47 @@ body.memory-tech-open .toast{z-index:5100}
 .memory-tech-overlay .creative-dialog>button{display:block;width:100%;text-align:left}
 .memory-tech-overlay .creative-toolbar button{width:auto}
 @media(max-width:600px){.memory-page{padding-bottom:150px}.memory-project{max-width:100%;flex-basis:100%;order:-1}}
+
+/* Thanh công cụ gọn một hàng: tên (cắt bớt) · Dự án · Dựng · ⋯ · ＋ */
+.memory-toolbar{flex-wrap:nowrap;gap:6px;padding:8px 10px;position:relative}
+.memory-toolbar h1,.memory-toolbar .memory-project{flex:1 1 0;min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;order:0;flex-basis:0}
+.memory-toolbar .memory-project{font-size:14px}
+.memory-toolbar>*{flex:none}
+.memory-toolbar>h1,.memory-toolbar>.memory-project{flex:1 1 0}
+.memory-toolbar .memory-link,.memory-page .memory-toolbar>button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 10px;font-size:12px}
+.memory-page .memory-toolbar>.ky-project{flex:1 1 0;min-width:0;justify-content:flex-start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;text-align:left}
+.memory-toolbar>h1{flex:0 1 auto}
+.memory-page .memory-toolbar>.memory-add,.memory-page .memory-toolbar .memory-more-btn{min-width:44px;min-height:44px;padding:0 10px;font-size:22px;line-height:1}
+.memory-page .memory-toolbar .memory-more-btn{font-size:20px;font-weight:700}
+.memory-page .memory-build{position:relative;font-weight:650}
+.memory-build-dot{display:inline-block;width:8px;height:8px;margin-left:6px;border-radius:50%;background:#bbb;vertical-align:middle}
+.memory-build-dot[data-state=running]{background:#c58f37;animation:memoryPulse 1.2s infinite}
+.memory-build-dot[data-state=done]{background:#3f8461}
+.memory-build-dot[data-state=failed]{background:#b3261e}
+@keyframes memoryPulse{50%{opacity:.35}}
+.memory-more{position:relative;display:inline-flex}
+.memory-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:210px;max-width:calc(100vw - 20px);padding:6px;background:#fff;border:1px solid #e0d8c8;border-radius:12px;box-shadow:0 12px 32px #1a102626;display:flex;flex-direction:column;gap:2px}
+.memory-menu[hidden]{display:none!important}
+.memory-page .memory-menu-item{display:flex;align-items:center;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:#29343e;font:14px system-ui,sans-serif;text-align:left;text-decoration:none;cursor:pointer;box-sizing:border-box}
+.memory-page .memory-menu-item:hover,.memory-page .memory-menu-item:focus-visible{background:#f8efdc}
+.memory-page .memory-menu-item[aria-pressed=true]{background:#fff1d9}
+.memory-page .memory-menu-item:disabled{opacity:.45}
+/* Dòng trạng thái lưu: nhỏ nhưng luôn thấy */
+.memory-statusrow{display:flex;align-items:center;gap:8px;min-width:0;padding:0 12px}
+.memory-statusrow .memory-status{flex:1;min-width:0;padding:3px 0;min-height:20px;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.memory-hint{padding:6px 12px 0}
+.memory-emotion button{min-height:40px}
+/* Thanh Draft: ẩn khi đang ở bảng thẻ, nút Dựng mở nó thành tờ trượt */
+body.memory-open:not(.draft-sheet-open) .bottom{display:none!important}
+.draft-backdrop{position:fixed;inset:0;z-index:2590;background:#1a102655}
+.draft-backdrop[hidden]{display:none!important}
+.draft-sheet-head{display:none;align-items:center;justify-content:space-between;gap:8px;margin:0 auto 8px;max-width:488px}
+body.draft-sheet-open .draft-sheet-head{display:flex}
+.draft-sheet-head button{min-height:44px}
+.draft-empty-note{max-width:488px;margin:0 auto 8px;font-size:12px;line-height:1.5;color:#7b683d}
+body.draft-sheet-open .bottom{border-radius:16px 16px 0 0;max-height:80dvh;overflow:auto;box-shadow:0 -10px 40px #1a102633}
+body.draft-sheet-open .bottom button{min-height:44px}
+body.draft-sheet-open .bottom .bottom-inner{flex-wrap:wrap}
+body.draft-sheet-open .bottom .status-row{flex-wrap:wrap}
+.memory-page{padding-bottom:0!important}
+@media(max-width:600px){.memory-toolbar{gap:4px;padding:6px 8px}.memory-toolbar .memory-link,.memory-page .memory-toolbar>button{padding:0 8px}.memory-project{max-width:none;flex-basis:0;order:0}.memory-page{padding-bottom:0}}

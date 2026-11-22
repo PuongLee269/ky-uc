@@ -29,7 +29,7 @@ input,textarea{font:inherit;color:#242a32}
 .ky-chip[data-state=saving]{background:#f8e9cd;color:#7a5410}
 .ky-chip[data-state=error]{background:#fbe3e0;color:#b3261e}
 /* Bản web không có phần cần máy tính: ẩn chỗ chấm điểm / biểu đồ người xem / lệnh AI. */
-.sp-score-all,.memory-chart-host,.memory-technical,.memory-scope{display:none!important}
+.memory-chart-host,.memory-technical,.memory-scope{display:none!important}
 .has-script{grid-template-columns:minmax(0,1fr)!important}
 .memory-page{padding-bottom:0!important}
 .ky-chip[data-state=offline]{background:#ece8e1;color:#5b5548}
@@ -37,3 +37,7 @@ input,textarea{font:inherit;color:#242a32}
 .ky-row .ky-item{flex:1;min-width:0}
 .ky-linkbox{display:flex;flex-direction:column;gap:8px;border-top:1px solid #e8e1d6;padding-top:10px}.ky-linkbox h3{margin:0;font-size:15px}
 .ky-steps{display:flex;flex-direction:column;gap:12px}.ky-steps p{margin:4px 0 0}
+
+/* Ký Ức: thanh công cụ một hàng, trang lấp đầy màn hình */
+body.ky-body .memory-page{min-height:100dvh}
+.ky-chip{max-width:100%}
